@@ -285,4 +285,6 @@ python add_torrent_info.py <directory>
 - `-t`, `--tracker`: Tracker URL (default: http://localhost:6969)
 
 
+---
+
 ## Complete Example Usage
