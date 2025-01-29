@@ -8,9 +8,9 @@ A lightweight BitTorrent tracker implementation with persistent state management
 - ✅ Peer announcements (`/announce`)
 - 📊 Torrent statistics scraping (`/scrape`)
 - ➕ Torrent metadata registration (`/add_torrent_info`)
-- 💾 State persistence to disk (JSON format)
-- 🔍 Similar hash detection (first 10 and last 5 characters)
-- 🧹 Automatic peer cleanup (30-minute inactivity window)
+- 💾 State persistence to disk (JSON format `tracker_state.json` by default)
+- 🔍 Similar hash detection (first 10 and last 5 characters by default with ability to adjust tolerances)
+- 🧹 Automatic peer cleanup (30-minute inactivity window by default)
 
 ### Client Script
 - 📁 Torrent file parsing (.torrent)
