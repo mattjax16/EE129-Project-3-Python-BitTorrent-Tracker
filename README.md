@@ -2,6 +2,25 @@
 
 A lightweight BitTorrent tracker implementation with persistent state management.
 
+### Why This Tracker?
+
+This project was created as an easy way to set up a private BitTorrent tracker for distributing torrents while maintaining 
+an extra layer of privacy. While no one should be able to access a torrent without its corresponding `.torrent` file, 
+using a private tracker ensures that peers only communicate through a controlled environment, without relying 
+on the Distributed Hash Table (DHT) or public trackers. This makes it useful for cases where you want to share 
+torrents securely while avoiding unnecessary exposure to public networks.
+
+
+### What I Learned
+
+While building this tracker, I gained a deeper understanding of networking concepts, particularly in 
+implementing application-layer protocols. The BitTorrent protocol itself requires handling structured 
+peer communication through HTTP-based announce requests and responses. Additionally, I had to implement 
+techniques like:
+- *Bencoding:* A unique encoding format used by BitTorrent for serializing data efficiently.
+- *SHA-1 Hashing:* Used to generate and verify torrent info hashes, ensuring data integrity.
+- *State Management & Persistence:* Keeping track of peers, torrents, and session data while ensuring that state is preserved across restarts.
+
 ## Features
 
 ### Tracker Server
