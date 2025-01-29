@@ -297,7 +297,7 @@ shutdown_event = threading.Event()
 # Default root (sends to announce)
 @app.route('/', methods=['GET'])
 def root_announce():
-    return announce()  # Reuse the existing announce function
+    return announce()
 
 @app.route('/announce', methods=['GET'])
 def announce():
