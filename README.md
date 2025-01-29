@@ -17,9 +17,9 @@ While building this tracker, I gained a deeper understanding of networking conce
 implementing application-layer protocols. The BitTorrent protocol itself requires handling structured 
 peer communication through HTTP-based announce requests and responses. Additionally, I had to implement 
 techniques like:
-- *Bencoding:* A unique encoding format used by BitTorrent for serializing data efficiently.
-- *SHA-1 Hashing:* Used to generate and verify torrent info hashes, ensuring data integrity.
-- *State Management & Persistence:* Keeping track of peers, torrents, and session data while ensuring that state is preserved across restarts.
+- ***Bencoding:*** A unique encoding format used by BitTorrent for serializing data efficiently.
+- ***SHA-1 Hashing:*** Used to generate and verify torrent info hashes, ensuring data integrity.
+- ***State Management & Persistence:*** Keeping track of peers, torrents, and session data while ensuring that state is preserved across restarts.
 
 ## Features
 
