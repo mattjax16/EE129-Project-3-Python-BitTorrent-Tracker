@@ -2,14 +2,70 @@ from flask import Flask, request, jsonify
 import time
 import signal
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Dict, Set, Optional
 import urllib.parse
 import threading
 import bencodepy
+import string
 import codecs
+import json
+import os
 
 
+def is_similar_hash(hash1: str, hash2: str, threshold: float = 0.95) -> bool:
+    """
+    Compare two info hashes by checking their first 10 and last 5 characters.
+
+    Args:
+        hash1: First info hash
+        hash2: Second info hash
+        threshold: Not used in this implementation but kept for compatibility
+
+    Returns:
+        bool: True if hashes match in their first 10 and last 5 characters
+    """
+    # Safety check for hash length
+    if len(hash1) < 15 or len(hash2) < 15:
+        return False
+
+    # Get the parts we want to compare
+    hash1_start = hash1[:10]
+    hash1_end = hash1[-5:]
+    hash2_start = hash2[:10]
+    hash2_end = hash2[-5:]
+
+    # Return True only if both parts match
+    return hash1_start == hash2_start and hash1_end == hash2_end
+
+
+def find_similar_hash(target_hash: str, existing_hashes: Set[str], threshold: float = 0.95) -> Optional[str]:
+    """
+    Find a hash from existing_hashes that matches the target_hash in first 10 and last 5 characters.
+
+    Args:
+        target_hash: Hash to compare against
+        existing_hashes: Set of existing hashes to check
+        threshold: Not used in this implementation but kept for compatibility
+
+    Returns:
+        Optional[str]: First matching hash found, None if no matches
+    """
+    if not existing_hashes or len(target_hash) < 15:
+        return None
+
+    # Get the parts of the target hash we want to compare
+    target_start = target_hash[:10]
+    target_end = target_hash[-5:]
+
+    # Find the first hash that matches our criteria
+    for existing_hash in existing_hashes:
+        if len(existing_hash) >= 15:
+            if (existing_hash[:10] == target_start and
+                    existing_hash[-5:] == target_end):
+                return existing_hash
+
+    return None
 
 
 @dataclass(eq=True, frozen=True)
@@ -23,6 +79,13 @@ class Peer:
     left: int = 0
     is_seeder: bool = False
 
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
+
 
 @dataclass
 class TorrentInfo:
@@ -31,14 +94,111 @@ class TorrentInfo:
     size: int = 0
     piece_length: int = 0
     creation_date: float = 0.0
-    comment: str = ""
-    created_by: str = ""
+    comment: Optional[str] = None
+    created_by: Optional[str] = None
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
 
 
 class Tracker:
     def __init__(self):
         self.torrents: Dict[str, Set[Peer]] = {}
         self.torrent_info: Dict[str, TorrentInfo] = {}
+        self.data_file = "tracker_state.json"
+        self.load_state()
+
+    def save_state(self):
+        """Save tracker state to disk."""
+        try:
+            state = {
+                'torrents': {
+                    info_hash: {
+                        'info': info.to_dict(),
+                        'peers_info': [peer.to_dict() for peer in self.get_peers(info_hash)],
+                        'stats': self.get_stats(info_hash)
+                    }
+                    for info_hash, info in self.torrent_info.items()
+                }
+            }
+
+            print(state)
+
+
+            with open(self.data_file, 'w') as f:
+                json.dump(state, f, indent=2)
+
+            print(f"\nSaved tracker state to {self.data_file}")
+            print(f"Active torrents: {len(self.torrents)}")
+            for info_hash, peers in self.torrents.items():
+                stats = self.get_stats(info_hash)
+                torrent_info = self.torrent_info.get(info_hash, TorrentInfo(info_hash))
+                print(f"Torrent {torrent_info.name or info_hash}:")
+                print(f"  Peers: {stats['peers']}")
+                print(f"  Seeders: {stats['complete']}")
+                print(f"  Leechers: {stats['incomplete']}")
+                print(f"  Total uploaded: {stats['uploaded']}")
+                print(f"  Total downloaded: {stats['downloaded']}")
+
+            return state
+
+        except Exception as e:
+            print(f"Error saving tracker state: {e}")
+
+    def load_state(self):
+        """Load tracker state from disk if it exists."""
+        try:
+            if os.path.exists(self.data_file):
+                with open(self.data_file, 'r') as f:
+                    state = json.load(f)
+
+                # Restore torrent info
+                self.torrent_info = {
+                    info_hash: TorrentInfo.from_dict(torrent_data['info'])
+                    for info_hash, torrent_data in state.get('torrents', {}).items()
+                }
+
+                # Restore torrents and peers, keeping only the most recent peer IDs
+                self.torrents = {}
+                for info_hash, torrent_data in state.get('torrents', {}).items():
+                    peers_info = torrent_data.get('peers_info', [])
+                    if peers_info:
+                        # Sort peers by last_seen in descending order and keep the most recent ones
+                        sorted_peers = sorted(peers_info, key=lambda p: p['last_seen'], reverse=True)
+                        unique_peers = {}
+                        for peer_data in sorted_peers:
+                            peer_id = peer_data['peer_id']
+                            if peer_id not in unique_peers:
+                                unique_peers[peer_id] = Peer.from_dict(peer_data)
+                        self.torrents[info_hash] = set(unique_peers.values())
+
+                print(f"\nLoaded tracker state from {self.data_file}")
+                print(f"Loaded torrents: {len(self.torrents)}")
+
+                # Clean up old peers on load
+                current_time = time.time()
+                for info_hash in list(self.torrents.keys()):
+                    active_peers = {
+                        peer for peer in self.torrents[info_hash]
+                        if current_time - peer.last_seen < 1800  # 30 minutes
+                    }
+                    if active_peers:
+                        self.torrents[info_hash] = active_peers
+                    else:
+                        del self.torrents[info_hash]
+                        if info_hash in self.torrent_info:
+                            del self.torrent_info[info_hash]
+
+                print(f"Active torrents after cleanup: {len(self.torrents)}")
+
+        except Exception as e:
+            print(f"Error loading tracker state: {e}")
+            self.torrents = {}
+            self.torrent_info = {}
 
     def add_torrent(self, info_hash: str, name: str = "", size: int = 0,
                     piece_length: int = 0, comment: str = "", created_by: str = ""):
@@ -58,6 +218,8 @@ class Tracker:
 
     def add_peer(self, info_hash: str, peer_id: str, ip: str, port: int,
                  uploaded: int = 0, downloaded: int = 0, left: int = 0):
+
+
 
         """Add or update a peer for a specific torrent."""
         if info_hash not in self.torrents:
@@ -125,19 +287,6 @@ class Tracker:
             'peers': len(peers)
         }
 
-    def save_state(self):
-        """Save tracker state before shutdown."""
-        print("\nSaving tracker state...")
-        print(f"Active torrents: {len(self.torrents)}")
-        for info_hash, peers in self.torrents.items():
-            stats = self.get_stats(info_hash)
-            torrent_info = self.torrent_info.get(info_hash, TorrentInfo(info_hash))
-            print(f"Torrent {torrent_info.name or info_hash}:")
-            print(f"  Peers: {stats['peers']}")
-            print(f"  Seeders: {stats['complete']}")
-            print(f"  Leechers: {stats['incomplete']}")
-            print(f"  Total uploaded: {stats['uploaded']}")
-            print(f"  Total downloaded: {stats['downloaded']}")
 
 
 app = Flask(__name__)
@@ -154,14 +303,8 @@ def root_announce():
 def announce():
     try:
         # Parse required parameters
+
         info_hash = request.args.get('info_hash')
-
-
-
-
-
-
-
         peer_id = request.args.get('peer_id')
         port = int(request.args.get('port'))
         uploaded = int(request.args.get('uploaded', 0))
@@ -196,6 +339,7 @@ def announce():
             'peers': peer_list
         }
 
+        print(f"Announcemnt returned: {return_vals}")
         return bencodepy.encode(return_vals)
 
 
@@ -231,24 +375,35 @@ def scrape():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/add_torrent', methods=['POST'])
-def add_torrent():
+@app.route('/add_torrent_info', methods=['POST'])
+def add_torrent_info():
+
+
+
     """Add a new torrent to the tracker."""
     try:
         data = request.get_json()
+
         if not data or 'info_hash' not in data:
             return jsonify({'error': 'Missing info_hash'}), 400
 
-        tracker.add_torrent(
-            info_hash=data['info_hash'],
-            name=data.get('name', ''),
-            size=data.get('size', 0),
-            piece_length=data.get('piece_length', 0),
-            comment=data.get('comment', ''),
-            created_by=data.get('created_by', '')
-        )
+        '''Find similar hash in the existing torrents'''
+        info_hash = data['info_hash']
+        similar_hash = find_similar_hash(info_hash, tracker.torrents.keys())
 
-        return jsonify({'message': 'Torrent added successfully'})
+        '''If similar hash is found, update the torrent info'''
+        if similar_hash:
+            tracker.torrent_info[similar_hash].name = data.get('name', '')
+            tracker.torrent_info[similar_hash].size = data.get('size', 0)
+            tracker.torrent_info[similar_hash].piece_length = data.get('piece_length', 0)
+            tracker.torrent_info[similar_hash].comment = data.get('comment', '')
+            tracker.torrent_info[similar_hash].created_by = data.get('created_by', '')
+
+
+
+
+
+        return jsonify({'message': 'Torrent info added successfully'})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -275,6 +430,12 @@ def get_stats():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/save_state', methods=['GET'])
+def save_state():
+    """Save tracker state to disk."""
+    tracker.save_state()
+    return jsonify({'message': 'Tracker state saved'})
+
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
     """Endpoint to trigger graceful shutdown."""
@@ -290,10 +451,8 @@ def signal_handler(signum, frame):
 
 
 def run_server(host='0.0.0.0', port=6969):
-    """Run the server in a separate thread so we can monitor the shutdown event."""
-    from werkzeug.serving import run_simple
-    run_simple(host, port, app, threaded=True)
-
+    """Run the Flask server using its built-in development server."""
+    app.run(host=host, port=port, threaded=True, use_reloader=False)
 
 if __name__ == '__main__':
     # Register signal handlers
@@ -302,6 +461,7 @@ if __name__ == '__main__':
 
     try:
         print("Starting BitTorrent tracker on port 6969...")
+        # Create and start the server thread
         server_thread = threading.Thread(target=run_server)
         server_thread.daemon = True
         server_thread.start()
@@ -310,6 +470,14 @@ if __name__ == '__main__':
         while not shutdown_event.is_set():
             time.sleep(1)
 
+        print("Shutting down server...")
+        tracker.save_state()
+        sys.exit(0)
+
+    except Exception as e:
+        print(f"Error running server: {e}")
+        tracker.save_state()  # Try to save state even on error
+        sys.exit(1)
         print("Shutting down server...")
         tracker.save_state()
         sys.exit(0)
