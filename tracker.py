@@ -398,12 +398,18 @@ def add_torrent_info():
             tracker.torrent_info[similar_hash].piece_length = data.get('piece_length', 0)
             tracker.torrent_info[similar_hash].comment = data.get('comment', '')
             tracker.torrent_info[similar_hash].created_by = data.get('created_by', '')
+            return jsonify({'message': 'Torrent info added successfully'})
+
+
+        else:
+            return jsonify({'error': 'Invalid info_hash (Could not find torrent with similar hash)'}), 400
 
 
 
 
 
-        return jsonify({'message': 'Torrent info added successfully'})
+
+
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
