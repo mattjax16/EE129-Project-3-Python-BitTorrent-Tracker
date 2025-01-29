@@ -144,6 +144,7 @@ DATA_FILE = "tracker_state.json"  # State file location
      - Default: 6969
      - Purpose: The port number the tracker service listens on
      - Note: Should be open in firewall if using remote connections
+     - *This is the standard port for bittorrent trackers*
 
 2. **Timeout Settings**
    - `PEER_TIMEOUT`:
@@ -282,4 +283,5 @@ python add_torrent_info.py <directory>
 
 - `<torrent_file(s)>`: Path to a single torrent file (or multiple files)
 - `-t`, `--tracker`: Tracker URL (default: http://localhost:6969)
+
 
