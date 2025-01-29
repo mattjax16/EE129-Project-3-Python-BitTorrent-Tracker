@@ -13,14 +13,23 @@ import json
 import os
 
 
-def is_similar_hash(hash1: str, hash2: str, threshold: float = 0.95) -> bool:
+"""Globals"""
+
+IP = '0.0.0.0' # Default IP for the tracker
+PORT = 6969 # Default port for the tracker
+PEER_TIMEOUT = 1800  # 30 minutes in seconds
+HASH_SIMILARITY_THRESHOLD = 0.95  # 95% similarity threshold
+DATA_FILE = "tracker_state.json" # File to save tracker state
+
+
+def is_similar_hash(hash1: str, hash2: str, threshold: float = HASH_SIMILARITY_THRESHOLD) -> bool:
     """
     Compare two info hashes by checking their first 10 and last 5 characters.
 
     Args:
         hash1: First info hash
         hash2: Second info hash
-        threshold: Not used in this implementation but kept for compatibility
+        threshold: Similarity threshold (0-1), defaults to HASH_SIMILARITY_THRESHOLD
 
     Returns:
         bool: True if hashes match in their first 10 and last 5 characters
@@ -39,14 +48,14 @@ def is_similar_hash(hash1: str, hash2: str, threshold: float = 0.95) -> bool:
     return hash1_start == hash2_start and hash1_end == hash2_end
 
 
-def find_similar_hash(target_hash: str, existing_hashes: Set[str], threshold: float = 0.95) -> Optional[str]:
+def find_similar_hash(target_hash: str, existing_hashes: Set[str], threshold: float = HASH_SIMILARITY_THRESHOLD) -> Optional[str]:
     """
     Find a hash from existing_hashes that matches the target_hash in first 10 and last 5 characters.
 
     Args:
         target_hash: Hash to compare against
         existing_hashes: Set of existing hashes to check
-        threshold: Not used in this implementation but kept for compatibility
+        threshold: Similarity threshold (0-1), defaults to HASH_SIMILARITY_THRESHOLD
 
     Returns:
         Optional[str]: First matching hash found, None if no matches
@@ -66,6 +75,10 @@ def find_similar_hash(target_hash: str, existing_hashes: Set[str], threshold: fl
                 return existing_hash
 
     return None
+
+
+
+
 
 
 @dataclass(eq=True, frozen=True)
@@ -109,7 +122,7 @@ class Tracker:
     def __init__(self):
         self.torrents: Dict[str, Set[Peer]] = {}
         self.torrent_info: Dict[str, TorrentInfo] = {}
-        self.data_file = "tracker_state.json"
+        self.data_file = DATA_FILE
         self.load_state()
 
     def save_state(self):
@@ -251,11 +264,11 @@ class Tracker:
 
         peers = self.torrents[info_hash]
 
-        # Remove peers that haven't been seen in 30 minutes
+        # Remove peers that haven't been seen in PEER_TIMEOUT seconds
         current_time = time.time()
         active_peers = {
             peer for peer in peers
-            if current_time - peer.last_seen < 1800
+            if current_time - peer.last_seen < PEER_TIMEOUT
         }
         self.torrents[info_hash] = active_peers
 
