@@ -306,4 +306,106 @@ python add_torrent_info.py <directory>
 
 ---
 
-## Complete Example Usage
+# Complete Example Usage
+
+This guide provides clear step-by-step guidance for setting up the tracker, creating torrents, adding torrent info, 
+and checking tracker statistics.
+
+> **Note**: Throughout this guide, `<tracker-ip>` is a placeholder. Replace it with the actual IP address shown in your console when starting the tracker server.
+
+### Installation
+
+1. **Clone the Repository**
+```bash
+git clone https://github.com/your-repo/tracker.git
+cd tracker
+```
+
+2. **Install Dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+### Setting Up the Tracker
+
+1. **Start the tracker server** (default port: `6969`)
+```bash
+python tracker.py
+```
+The tracker will now listen for peer announcements and manage torrents. The console will display the tracker's IP 
+address - note this down as you'll need it for all following steps.
+
+2. **Verify the tracker is running** by checking its status:
+```bash
+curl http://<tracker-ip>:6969/stats
+```
+If everything is set up correctly, this should return an empty tracker state at first.
+
+### Creating a Torrent & Announcing to the Tracker
+
+1. **Create a `.torrent` file** 
+You can use any BitTorrent client to create a torrent file, though qBittorrent is recommended as it's free, open-source, and user-friendly. When creating the torrent:
+- In the tracker address field, make sure to specify your tracker's IP and port with the full URL format: `http://<tracker-ip>:6969/announce`
+  - The `http://` prefix is essential - don't forget it!
+  - Replace `<tracker-ip>` with the IP address that was shown when you started the tracker server
+
+For enhanced privacy, you can disable DHT (Distributed Hash Table) network distribution. The DHT network is a decentralized 
+way for peers to find each other without a tracker, but disabling it ensures that only peers connected to your private 
+tracker can participate in sharing.
+
+2. **Announce to the tracker** (from a BitTorrent client)
+   - Load `example.torrent` into a torrent client (e.g., qBittorrent, Transmission)
+   - The client will send an **announce** request to `http://<tracker-ip>:6969/announce`
+   - The tracker will now list this torrent along with the connected peers
+
+### Checking Tracker Statistics
+
+1. **Retrieve torrent statistics** using the scrape API:
+```bash
+curl "http://<tracker-ip>:6969/scrape?info_hash=<info_hash>"
+```
+This returns seeders, leechers, and completed downloads for the given torrent. `<info_hash>` is the SHA-1 hash of the torrent's info dictionary (hex or binary encoded).
+
+2. **Get a full tracker overview**:
+```bash
+curl "http://<tracker-ip>:6969/stats"
+```
+This displays all active torrents and their peer lists.
+
+### Adding Torrent Info Manually
+
+1. **Manually register a torrent's metadata**:
+```bash
+python add_torrent_info.py example.torrent
+```
+This extracts torrent details and sends them to the tracker's `/add_torrent_info` endpoint.
+
+2. **Alternative: Use a direct API request**:
+```bash
+curl -X POST http://<tracker-ip>:6969/add_torrent_info \
+    -H "Content-Type: application/json" \
+    -d '{"info_hash": "<info_hash>", "name": "example", "size": 1048576}'
+```
+This manually adds a torrent entry for tracking.
+
+### Announcing Another Peer (From a Different Computer)
+
+When another user wants to download the torrent:
+
+1. **Load the torrent file on the second computer**
+   - Copy the `.torrent` file to the second computer
+   - Open it with a BitTorrent client (like qBittorrent)
+   - The client will automatically send an announce request to the tracker URL specified in the torrent file
+   - Note: The torrent file already contains the correct tracker IP address you specified when creating it
+
+2. **Verify both peers are connected**:
+```bash
+curl "http://<tracker-ip>:6969/stats"
+```
+You'll see two peers listed for the torrent:
+- The original peer (showing as a "seeder") who has the complete file and is uploading
+- The new peer (showing as a "leecher") who is currently downloading
+
+The tracker facilitates this connection, allowing the seeder to share the files with the leecher. As the download 
+progresses, you'll see the leecher's "downloaded" and "left" values change in the stats. Once the download completes, 
+the leecher will automatically become another seeder in the swarm.
