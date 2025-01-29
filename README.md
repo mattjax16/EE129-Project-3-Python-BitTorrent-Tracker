@@ -52,8 +52,8 @@ requests
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/mattjax16/EE129-Project-3-Python-BitTorrent-Tracker.git
-   cd EE129-Project-3-Python-BitTorrent-Tracker
+   git clone https://github.com/mattjax16/Python-BitTorrent-Tracker.git
+   cd Python-BitTorrent-Tracker
    ```
 2. Install dependencies:
    ```bash
@@ -331,8 +331,8 @@ and checking tracker statistics.
 1. **Clone the Repository**
 
 ```bash
-git clone https://github.com/your-repo/tracker.git
-cd tracker
+git clone https://github.com/mattjax16/Python-BitTorrent-Tracker.git
+cd Python-BitTorrent-Tracker
 ```
 
 2. **Install Dependencies**
@@ -363,7 +363,7 @@ If everything is set up correctly, this should return an empty tracker state at 
 ### Creating a Torrent & Announcing to the Tracker
 
 1. **Create a `.torrent` file**
-   You can use any BitTorrent client to create a torrent file, though qBittorrent is recommended as it's free, open-source, and user-friendly. When creating the torrent:
+   You can use any BitTorrent client to create a torrent file, though [qBittorrent](https://www.qbittorrent.org/) is recommended as it's free, open-source, and user-friendly. When creating the torrent:
 
 - In the tracker address field, make sure to specify your tracker's IP and port with the full URL format: `http://<tracker-ip>:6969/announce`
   - The `http://` prefix is essential - don't forget it!
@@ -374,7 +374,7 @@ way for peers to find each other without a tracker, but disabling it ensures tha
 tracker can participate in sharing.
 
 2. **Announce to the tracker** (from a BitTorrent client)
-   - Load `example.torrent` into a torrent client (e.g., qBittorrent, Transmission)
+   - Load `example.torrent` into a torrent client (e.g., [qBittorrent](https://www.qbittorrent.org/), [Transmission](https://transmissionbt.com/))
    - The client will send an **announce** request to `http://<tracker-ip>:6969/announce`
    - The tracker will now list this torrent along with the connected peers
 
@@ -386,7 +386,7 @@ tracker can participate in sharing.
 curl "http://<tracker-ip>:6969/scrape?info_hash=<info_hash>"
 ```
 
-This returns seeders, leechers, and completed downloads for the given torrent. `<info_hash>` is the SHA-1 hash of the torrent's info dictionary (hex or binary encoded).
+This returns seeders, leechers, and completed downloads for the given torrent. `<info_hash>` is the SHA-1 hash of the torrent's info dictionary.
 
 2. **Get a full tracker overview**:
 
@@ -406,15 +406,6 @@ python add_torrent_info.py example.torrent
 
 This extracts torrent details and sends them to the tracker's `/add_torrent_info` endpoint.
 
-2. **Alternative: Use a direct API request**:
-
-```bash
-curl -X POST http://<tracker-ip>:6969/add_torrent_info \
-    -H "Content-Type: application/json" \
-    -d '{"info_hash": "<info_hash>", "name": "example", "size": 1048576}'
-```
-
-This manually adds a torrent entry for tracking.
 
 ### Announcing Another Peer (From a Different Computer)
 
